@@ -1,0 +1,49 @@
+$script = <<-'SCRIPT'
+# Install LXC
+sudo apt-get install lxc lxc-templates -y
+# Only need for Centos/Rhel containers
+sudo apt-get install yum -y
+# Network for LXC
+sudo cat > /etc/default/lxc-net << EOF
+USE_LXC_BRIDGE="true"
+LXC_BRIDGE="lxcbr0"
+LXC_ADDR="10.0.3.1"
+LXC_NETMASK="255.255.255.0"
+LXC_NETWORK="10.0.3.0/24"
+LXC_DHCP_RANGE="10.0.3.2,10.0.3.254"
+LXC_DHCP_MAX="253"
+LXC_DHCP_CONFILE=""
+LXC_DOMAIN=""
+EOF
+# Enable net 
+sudo systemctl enable lxc-net
+sudo systemctl start lxc-net
+# Default config network for LXC
+sudo sed -i 's/lxc.net.0.type = empty/lxc.net.0.type  = veth\nlxc.net.0.flags = up\nlxc.net.0.link  = lxcbr0\n/' /etc/lxc/default.conf
+# Create and start Linux Container
+sudo lxc-create -n web_static -t centos
+sudo lxc-start -n web_static
+# Wait after start 30 sec
+sleep 15
+### INSIDE LXC
+# Install need packages
+sudo lxc-attach -n web_static -- yum -y install httpd
+sudo lxc-attach -n web_static -- yum -y install git
+# Clone Projects to /var/www/html
+sudo lxc-attach -n web_static -- git clone https://github.com/Fenikks/itacademy-devops-files /var/www/html
+# Add to httpd Listen 8080
+sudo lxc-attach -n web_static -- sed -i 's/Listen 80/Listen 80\nListen 8080/' /etc/httpd/conf/httpd.conf
+# Create VirtualHost for 8080 port
+sudo cat > /var/lib/lxc/web_static/rootfs/etc/httpd/conf.d/it_academy.conf << EOF
+<VirtualHost *:8080>
+DocumentRoot /var/www/html/01-demosite-static
+</VirtualHost>
+EOF
+# Restart httpd
+sudo lxc-attach -n web_static -- systemctl restart httpd
+SCRIPT
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "debian/buster64"
+  config.vm.provision "shell", inline: $script
+end
