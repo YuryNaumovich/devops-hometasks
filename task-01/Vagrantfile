@@ -1,10 +1,9 @@
 $script = <<-'SCRIPT'
-sudo apt-get install apache2 php -y
-sudo echo "Listen 8080" >> /etc/apache2/ports.conf
-sudo echo "Listen 8081" >> /etc/apache2/ports.conf
+sudo yum install git -y
+sudo sed -i 's/Listen 80/Listen 80\nListen 8080\nListen 8081/' /etc/httpd/conf/httpd.conf
 sudo mkdir /var/www/html/itacademy-devops-files
 sudo git clone https://github.com/Fenikks/itacademy-devops-files /var/www/html/itacademy-devops-files
-sudo cat > /etc/apache2/sites-available/it_academy.conf << EOF
+sudo cat > /etc/httpd/conf.d/it_academy.conf << EOF
 <VirtualHost *:8080>
 DocumentRoot /var/www/html/itacademy-devops-files/01-demosite-static
 </VirtualHost>
@@ -12,13 +11,26 @@ DocumentRoot /var/www/html/itacademy-devops-files/01-demosite-static
 DocumentRoot /var/www/html/itacademy-devops-files/01-demosite-php
 </VirtualHost>
 EOF
-sudo a2ensite it_academy
-sudo systemctl reload apache2
+# Firewall
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload
+# Disable SELinux
+sudo setenforce 0
+sudo systemctl restart httpd
+SCRIPT
+
+$web_test = <<-'SCRIPT'
+echo "01-demosite-static"
+curl 127.0.0.1:8080
+echo "01-demosite-php"
+curl 127.0.0.1:8081
 SCRIPT
 
 Vagrant.configure("2") do |config|
- config.vm.box = "generic/debian10"
+ config.vm.box = "yurynaumovich/Centos8_httpd_php_mysql-server"
  config.vm.provision "shell", inline: $script
- config.vm.network "forwarded_port", guest: 8080, host: 8080
- config.vm.network "forwarded_port", guest: 8081, host: 8081
+ config.vm.provision "shell", run: "always", inline: $web_test
+ config.vm.network "forwarded_port", guest: 80, host: 8080
+ config.vm.network "forwarded_port", guest: 81, host: 8081
 end
