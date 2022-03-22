@@ -12,11 +12,12 @@ DocumentRoot /var/www/html/itacademy-devops-files/01-demosite-php
 </VirtualHost>
 EOF
 # Firewall
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --zone=public --permanent --add-port=8080/tcp
+sudo firewall-cmd --zone=public --permanent --add-port=8081/tcp
 sudo firewall-cmd --reload
 # Disable SELinux
 sudo setenforce 0
+# Restart httpd
 sudo systemctl restart httpd
 SCRIPT
 
@@ -31,6 +32,6 @@ Vagrant.configure("2") do |config|
  config.vm.box = "yurynaumovich/Centos8_httpd_php_mysql-server"
  config.vm.provision "shell", inline: $script
  config.vm.provision "shell", run: "always", inline: $web_test
- config.vm.network "forwarded_port", guest: 80, host: 8080
- config.vm.network "forwarded_port", guest: 81, host: 8081
+ config.vm.network "forwarded_port", guest: 8080, host: 8080
+ config.vm.network "forwarded_port", guest: 8081, host: 8081
 end
