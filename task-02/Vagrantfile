@@ -30,8 +30,8 @@ sleep 10
 sudo lxc-attach -n web_static -- yum -y install httpd git
 # Clone Projects to /var/www/html
 sudo lxc-attach -n web_static -- git clone https://github.com/Fenikks/itacademy-devops-files /var/www/html
-# Add to httpd Listen 8080
-sudo lxc-attach -n web_static -- sed -i 's/Listen 80/Listen 80\nListen 8080/' /etc/httpd/conf/httpd.conf
+# Add to httpd Listen 8080 and 8081
+sudo lxc-attach -n web_static -- sed -i 's/Listen 80/Listen 80\nListen 8080\nListen 8081/' /etc/httpd/conf/httpd.conf
 # Create 2nd container: web_dynamic
 sudo lxc-stop -n web_static 
 sudo lxc-copy -n web_static -N web_dynamic
@@ -45,9 +45,9 @@ sudo cat > /var/lib/lxc/web_static/rootfs/etc/httpd/conf.d/it_academy.conf << EO
 DocumentRoot /var/www/html/01-demosite-static
 </VirtualHost>
 EOF
-# Create VirtualHost for 8080 port for web_dynamic
+# Create VirtualHost for 8081 port for web_dynamic
 sudo cat > /var/lib/lxc/web_dynamic/rootfs/etc/httpd/conf.d/it_academy.conf << EOF
-<VirtualHost *:8080>
+<VirtualHost *:8081>
 DocumentRoot /var/www/html/01-demosite-php
 </VirtualHost>
 EOF
@@ -62,12 +62,18 @@ $lxc_test = <<SETUP
 echo "FOR TESTING - RUN ALWAYS"
 ip_web_dynamic=`sudo lxc-info -n web_dynamic -iH`
 ip_web_static=`sudo lxc-info -n web_static -iH`
+# Show web pages 
 sudo curl $ip_web_static:8080
-sudo curl $ip_web_dynamic:8080
+sudo curl $ip_web_dynamic:8081
+# Add ports 8080,8081: Local - VirtualBox - LXC
+sudo iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 8080 -j DNAT --to-destination $ip_web_static:8080
+sudo iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 8081 -j DNAT --to-destination $ip_web_dynamic:8081
 SETUP
 
 Vagrant.configure("2") do |config|
   config.vm.box = "debian/buster64"
   config.vm.provision "shell", inline: $script
   config.vm.provision "shell", run: "always", inline: $lxc_test
+  config.vm.network "forwarded_port", guest: 8080, host: 8080
+  config.vm.network "forwarded_port", guest: 8081, host: 8081
 end
