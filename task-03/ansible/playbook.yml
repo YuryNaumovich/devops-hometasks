@@ -1,0 +1,66 @@
+  - hosts: default
+    become: true
+    vars:
+     static_http_port: 8080
+     dynamic_http_port: 8081
+     ssh_port: 22
+     firewall_static_http_port: 8080/tcp
+     firewall_dynamic_http_port: 8081/tcp
+     firewall_ssh_port: 22/tcp
+     http_conf: it_academy.conf
+    tasks:
+      - name: install packages
+        yum:
+         name: git
+         state: latest
+
+      - name: Ensure the default Apache port is 
+        lineinfile:
+         path: /etc/httpd/conf/httpd.conf
+         line: "{{ item }}"
+         insertbefore: Listen 80
+        with_items:
+         - 'Listen 8080'
+         - 'Listen 8081'
+
+      - name : Creates directory
+        file:
+         path: /var/www/html/it_academy
+         state: directory
+
+       #- name: Clone directory
+         #shell: git clone https://github.com/Fenikks/itacademy-devops-files /var/www/html/it_academy
+
+      - name: Add Apache VirtualHost
+        template:
+         src: "/vagrant/{{ http_conf }}"
+         dest: "/etc/httpd/conf.d/{{ http_conf }}"
+
+      - name: "FirewallD rules: Allow HTTP on port {{ static_http_port }}:{{ dynamic_http_port }}"
+        firewalld:
+         zone: public
+         port: "{{ item }}"
+         permanent: true
+         state: enabled
+        with_items:
+         - 8080/tcp
+         - 8081/tcp
+         - 22/tcp
+        notify:
+         - Reload firewalld
+
+      - name: Disable SELinux
+        selinux:
+         state: disabled
+
+      - name: Restart service httpd, in all cases
+        ansible.builtin.service:
+         name: httpd
+         state: restarted
+    
+    handlers:
+      - name: Reload firewalld
+        service:
+         name: firewalld
+         state: reloaded
+
