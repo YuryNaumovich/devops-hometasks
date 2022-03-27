@@ -1,0 +1,77 @@
+- hosts: all
+  become: true  
+  tasks:
+  - name: install packages
+    yum:
+     name:
+      - httpd
+      - git
+  - name : Create /var/www/html/it_academy
+    file:
+     path: /var/www/html/it_academy
+     state: directory
+ 
+  - name: Clone directory
+    shell: git clone https://github.com/Fenikks/itacademy-devops-files /var/www/html/it_academy
+ 
+  - name: VirtualHost
+    copy:
+     src: /vagrant/it_academy.conf
+     dest: /etc/httpd/conf.d/it_academy.conf
+
+
+- hosts: web_static
+  tasks:
+  - name: Ensure the default Apache port is
+    lineinfile:
+     path: /etc/httpd/conf/httpd.conf
+     line: "{{ item }}"
+     insertbefore: Listen 80
+    loop:
+       - 'Listen 8080'
+  
+  - name: Start httpd
+    service: 
+     name: httpd
+     state: started
+
+  - name: Restart httpd
+    service:
+     name: httpd
+     state: reloaded
+
+
+- hosts: web_dynamic
+  tasks:
+  - name: install packages
+    yum:
+     name: php
+
+  - name: Ensure the default Apache port is
+    lineinfile:
+     path: /etc/httpd/conf/httpd.conf
+     line: "{{ item }}"
+     insertbefore: Listen 80
+    loop:
+      - 'Listen 8081'
+
+  - name: Start httpd
+    service:
+     name: httpd
+     state: started
+
+  - name: Reload httpd
+    service:
+     name: httpd
+     state: reloaded
+
+  handlers:
+  - name: Start httpd
+    service: 
+     name: httpd
+     state: started
+
+  - name: Reload httpd
+    service:
+     name: httpd
+     state: reloaded

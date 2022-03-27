@@ -1,0 +1,88 @@
+- hosts: default
+  become: true
+  tasks:
+  - name: install packages
+    apt:
+     name:
+      - python3
+      - python3-dev
+      - lxc
+      - lxc-templates
+      - python3-lxc
+     state: present
+
+  - name: Install collection Manage LXC Containers (Need Ansible > 2.9.x)
+    shell: '{{ item }}'
+    loop:
+     - ansible-galaxy collection install community.general
+
+
+  - name: Create LXC container web_static and clone it to web_dynamic
+    community.general.lxc_container:
+     name: web_static
+     container_log: true
+     template: download
+     template_options: --dist centos --release 7 --arch amd64 --no-validate
+     state: started
+     clone_name: web_dynamic
+
+  - name: Start a container web_dynamic
+    community.general.lxc_container:
+     name: web_dynamic
+     state: started
+ 
+  - name: Create /etc/ansible/hosts
+    ansible.builtin.shell: |
+     # Wait full load system
+     sleep 15
+     ip_web_dynamic=`sudo lxc-info -n web_dynamic -iH`
+     ip_web_static=`sudo lxc-info -n web_static -iH`
+     sudo iptables -t nat -A PREROUTING -p tcp -i enp0s3 --dport 8080 -j DNAT --to-destination $ip_web_static:8080
+     sudo iptables -t nat -A PREROUTING -p tcp -i enp0s3 --dport 8081 -j DNAT --to-destination $ip_web_dynamic:8081
+     # Install SSH
+     sudo lxc-attach -n web_static -- yum -y install openssh-server
+     sudo lxc-attach -n web_static -- systemctl restart sshd
+     sudo lxc-attach -n web_dynamic -- yum -y install openssh-server
+     sudo lxc-attach -n web_dynamic -- systemctl restart sshd
+     sudo lxc-attach -n web_static -- mkdir /root/.ssh
+     sudo lxc-attach -n web_dynamic -- mkdir /root/.ssh
+     sudo cat > /etc/ansible/hosts << EOF
+     [web_static]
+     $ip_web_static ansible_user=root 
+     [web_dynamic]
+     $ip_web_dynamic ansible_user=root
+     EOF
+     exit 0
+
+  - name: Create RSA
+    shell: |
+     ssh-keygen -t rsa -C "vagrant@"ubuntu-focal -f /home/vagrant/.ssh/id_rsa -N ''
+     sudo chown vagrant:vagrant /home/vagrant/.ssh/id_rsa
+     exit 0
+
+  - name: Copy 
+    ansible.builtin.copy:
+     src: /home/vagrant/.ssh/id_rsa.pub
+     dest: '{{ item }}'
+    loop: 
+     - /var/lib/lxc/web_dynamic/rootfs/root/.ssh/authorized_keys
+     - /var/lib/lxc/web_static/rootfs/root/.ssh/authorized_keys
+
+  - name: StrictHostKeyChecking set no - ssh_config
+    lineinfile: 
+     path: /etc/ssh/ssh_config
+     regexp: '^#   StrictHostKeyChecking'
+     line: 'StrictHostKeyChecking no'
+
+  - name: Stop and Start ssh
+    service:
+     name: ssh
+     state: restarted
+
+  - name: Ping pong 
+    shell: ansible all -m ping --key-file "/home/vagrant/.ssh/id_rsa"
+
+  - name: Config LXC with ansible local playbook
+    shell: ansible-playbook /vagrant/lxc_local_playbook.yml
+  
+  handlers:
