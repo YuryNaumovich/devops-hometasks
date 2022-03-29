@@ -1,0 +1,110 @@
+- hosts: web
+  become: true
+  tasks:
+   - name: Install need package
+     apt:
+      name: 
+       - apache2
+       - curl
+       - software-properties-common
+
+   - name: Add repository for PHP 8.0
+     ansible.builtin.apt_repository:
+      repo: 'ppa:ondrej/php'
+      state: present
+
+   - name: Install php 8.0 and need package for Drupal
+     apt:
+      name: 
+       - php8.0
+       - php8.0-gd
+       - php8.0-pdo-sqlite
+       - php8.0-mysql
+       - php8.0-simplexml
+       - php8.0-gd
+       - php8.0-mbstring
+
+   - name: Download lates drupal
+     get_url:
+      url: 'https://ftp.drupal.org/files/projects/drupal-9.3.9.tar.gz'
+      dest: '/usr/src/drupal.tar.gz'
+   
+   - name: Extract drupal
+     ansible.builtin.unarchive:
+      src: '/usr/src/drupal.tar.gz'
+      dest: '/usr/src'
+      remote_src: True
+
+   - name: mv to /var/www/html
+     copy:
+      src: '/usr/src/drupal-9.3.9'
+      dest: '/var/www/html'
+      remote_src: yes
+      owner: 'www-data'
+      group: 'www-data'
+      mode: '0755'
+   
+   - name: Create settings.php for Drupal
+     copy:
+      src: '/var/www/html/drupal-9.3.9/sites/default/default.settings.php'
+      dest: '/var/www/html/drupal-9.3.9/sites/default/settings.php'
+      remote_src: yes
+      owner: 'www-data'
+      group: 'www-data'
+      mode: '0755'
+
+   - name: Create folder files
+     file:
+      path: '/var/www/html/drupal-9.3.9/sites/default/files'
+      state: directory
+      owner: 'www-data'
+      group: 'www-data'
+      mode: '0755'
+
+    #- name: Create hosts for LXC db container
+      #lineinfile:
+      #path: '/var/www/html/drupal-9.3.9/sites/default/default.settings.php'
+      #insertafter: '<?php'
+      #line: '{{ item }}'
+     #loop:
+     #- "];"
+     #- "'username' => 'drupal',"
+     #- "'password' => 'drupal',"
+     #- "'host' => '{{ db_host }}',"
+     #- "'port' => '3306',"
+     #- "'driver' => 'mysql',"
+     #- "'prefix' => '',"
+     #- "'collation' => 'utf8mb4_general_ci',"
+     #- "$databases['default']['default'] = ["
+
+   - name: Ensure the default Apache port is
+     lineinfile:
+      path: /etc/apache2/ports.conf
+      line: "{{ item }}"
+      insertbefore: Listen 80
+     loop:
+       - 'Listen 81'
+
+   - name: mod_rewrite enable apache2
+     community.general.apache2_module:
+      state: present
+      name: rewrite
+      force: True
+
+   - name: Copy virtualhost conf
+     get_url:
+      url: 'https://raw.githubusercontent.com/YuryNaumovich/devops-hometasks/main/task-03/ansible-drupal/drupal.conf'
+      dest: '/etc/apache2/sites-available/drupal.conf'
+   
+   - name: a2ensite drupal
+     shell: a2ensite drupal.conf
+
+   - name: Restart Apache2
+     service: 
+      name: apache2
+      state: restarted
+   
+    #- name: Drupal
+      #shell: "php -d memory_limit=256M /var/www/html/drupal-9.3.9/core/scripts/drupal quick-start demo_umami --port 81 -s"
+
+  handlers:

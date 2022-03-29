@@ -1,0 +1,45 @@
+---
+- hosts: db
+  vars: 
+   db_user: drupal
+   db_password: drupal
+   db_name: drupal
+  become: true
+  tasks:
+   - name: Install need package
+     apt:
+      name: 
+       - mysql-server
+       - python3-pymysql
+
+   - name: Ensure the default Apache port is
+     lineinfile:
+      path: /etc/mysql/mysql.conf.d/mysqld.cnf
+      line: "{{ item }}"
+      regexp: '^bind-address'
+     loop:
+       - 'bind-address = 0.0.0.0'
+     notify:
+       - Restart mysql
+
+   - name: Create DB "{{ db_name }}"
+     community.mysql.mysql_db:
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+      name: "{{ db_name }}"
+      state: present
+
+   - name: Create user "{{ db_name }}" and passwor "{{ db_password }}"
+     community.mysql.mysql_user:
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+      name: "{{ db_user }}"
+      password: "{{ db_password }}"
+      host: '%'
+      priv: 'drupal.*:ALL,GRANT'
+      state: present
+  
+  handlers:
+   - name: Restart mysql
+     ansible.builtin.service:
+      name: mysql
+      state: restarted
+

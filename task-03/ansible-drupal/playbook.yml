@@ -1,0 +1,135 @@
+- hosts: default
+  become: true
+  tasks:
+  - name: install packages
+    apt:
+     name:
+      - python3
+      - python3-dev
+      - lxc
+      - lxc-templates
+      - python3-lxc
+     state: present
+
+  - name: Install collection Manage LXC Containers (Need Ansible > 2.9.x)
+    shell: '{{ item }}'
+    loop:
+     - ansible-galaxy collection install community.general
+     - ansible-galaxy collection install community.crypto
+     - ansible-galaxy collection install community.mysql
+
+  - name: Create Openssh keypair
+    community.crypto.openssh_keypair:
+     path: /home/vagrant/.ssh/id_rsa
+
+  - name: Create LXC container web and db
+    community.general.lxc_container:
+     name: web
+     container_log: true
+     template: ubuntu
+     template_options: --release focal
+     state: stopped
+     clone_name: db
+
+  - name: Start container db
+    community.general.lxc_container:
+     name: db
+     state: started
+     container_command: |
+      sleep 10
+      yum -y install openssh-server
+      systemctl restart sshd
+      exit 0
+    register: lxc_container
+
+  - name: Create hosts for LXC db container
+    lineinfile:
+     path: /etc/ansible/hosts
+     insertafter: BOF
+     line: '{{ item }}'
+    loop:
+     - '{{ lxc_container.lxc_container.ips[0] }} ansible_user=root'
+     - '[db]' 
+
+  - name: "Set variables"
+    set_fact:
+     db_host: "{{ lxc_container.lxc_container.ips[0] }}"
+
+  - name: Start a container web
+    community.general.lxc_container:
+     name: web
+     state: started
+     container_command: |
+      sleep 10
+      yum -y install openssh-server
+      systemctl restart sshd
+      exit 0
+    register: lxc_container
+
+  - name: Create hosts for LXC web container 
+    lineinfile:
+     path: /etc/ansible/hosts
+     insertafter: BOF
+     line: '{{ item }}'
+    loop:
+     - '{{ lxc_container.lxc_container.ips[0] }} ansible_user=root'
+     - '[web]'
+
+  - name: Redirect 8080 traffic to port 81
+    iptables:
+     table: nat
+     chain: PREROUTING
+     in_interface: enp0s3
+     protocol: tcp
+     match: tcp
+     destination_port: '8080'
+     jump: 'DNAT'
+     to_destination: '{{ lxc_container.lxc_container.ips[0] }}:81'
+     comment: Redirect web traffic to port 81
+    become: yes
+
+  - name: Create directory in lxc conteiners /root/.ssh
+    file:
+     path: '{{ item }}'
+     state: directory
+    loop:
+     - /var/lib/lxc/web/rootfs/root/.ssh
+     - /var/lib/lxc/db/rootfs/root/.ssh
+ 
+  - name: Chown vagrant:vagrant /home/vagrant/.ssh/
+    file:
+     path: '{{ item }}'
+     owner: vagrant
+     group: vagrant
+    loop:
+     - /home/vagrant/.ssh/id_rsa
+
+  - name: Copy 
+    ansible.builtin.copy:
+     src: /home/vagrant/.ssh/id_rsa.pub
+     dest: '{{ item }}'
+    loop: 
+     - /var/lib/lxc/web/rootfs/root/.ssh/authorized_keys
+     - /var/lib/lxc/db/rootfs/root/.ssh/authorized_keys
+
+  - name: StrictHostKeyChecking set no - ssh_config
+    lineinfile: 
+     path: /etc/ssh/ssh_config
+     regexp: '^#   StrictHostKeyChecking'
+     line: 'StrictHostKeyChecking no'
+
+  - name: Stop and Start ssh
+    service:
+     name: ssh
+     state: restarted
+
+  - name: Ping pong 
+    shell: ansible all -m ping --key-file "/home/vagrant/.ssh/id_rsa"
+  
+  - name: Config lxc db container
+    shell: 'ansible-playbook /vagrant/db.yml'
+
+  - name: MySQL db_name - drupal, user - drupal, password - drupal, host - "{{ db_host }}"
+    shell: 'ansible-playbook /vagrant/web.yml'
+
+  handlers:
