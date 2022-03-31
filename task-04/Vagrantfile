@@ -1,0 +1,20 @@
+BOX_IMAGE = "generic/centos8"
+PLAYBOOK = "playbook.yml"
+SLAVE_COUNT = 2
+MASTER = "master.puppet"
+
+Vagrant.configure("2") do |config|
+  config.vm.box = BOX_IMAGE
+  config.vm.synced_folder ".", "/vagrant"
+
+  config.vm.define MASTER
+  
+  (1..SLAVE_COUNT).each do |i|
+   config.vm.define "slave#{i}.puppet"
+   
+  config.vm.provision "ansible_local" do |ansible|
+   ansible.playbook = PLAYBOOK
+  
+   end
+  end
+end
