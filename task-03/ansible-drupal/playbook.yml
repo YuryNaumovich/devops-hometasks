@@ -1,5 +1,8 @@
 - hosts: default
   become: true
+  vars: 
+   keypair: /home/vagrant/.ssh/id_rsa
+   key_pub: /home/vagrant/.ssh/id_rsa.pub
   tasks:
   - name: install packages
     apt:
@@ -20,7 +23,7 @@
 
   - name: Create Openssh keypair
     community.crypto.openssh_keypair:
-     path: /home/vagrant/.ssh/id_rsa
+     path: "{{ keypair }}"
 
   - name: Create LXC container web and db
     community.general.lxc_container:
@@ -98,15 +101,13 @@
  
   - name: Chown vagrant:vagrant /home/vagrant/.ssh/
     file:
-     path: '{{ item }}'
+     path: "{{ keypair }}"
      owner: vagrant
      group: vagrant
-    loop:
-     - /home/vagrant/.ssh/id_rsa
 
   - name: Copy 
     ansible.builtin.copy:
-     src: /home/vagrant/.ssh/id_rsa.pub
+     src: "{{ key_pub }}" 
      dest: '{{ item }}'
     loop: 
      - /var/lib/lxc/web/rootfs/root/.ssh/authorized_keys
@@ -124,12 +125,12 @@
      state: restarted
 
   - name: Ping pong 
-    shell: ansible all -m ping --key-file "/home/vagrant/.ssh/id_rsa"
+    shell: ansible all -m ping --key-file "{{ keypair }}"
   
   - name: Config lxc db container
-    shell: 'ansible-playbook /vagrant/db.yml --key-file "/home/vagrant/.ssh/id_rsa"'
+    shell: 'ansible-playbook /vagrant/db.yml --key-file "{{ keypair }}"'
 
   - name: MySQL db_name - drupal, user - drupal, password - drupal, host - "{{ db_host }}"
-    shell: 'ansible-playbook /vagrant/web.yml --key-file "/home/vagrant/.ssh/id_rsa"'
+    shell: 'ansible-playbook /vagrant/web.yml --key-file "{{ keypair }}"'
 
   handlers:
