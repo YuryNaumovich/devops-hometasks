@@ -127,9 +127,9 @@
     shell: ansible all -m ping --key-file "/home/vagrant/.ssh/id_rsa"
   
   - name: Config lxc db container
-    shell: 'ansible-playbook /vagrant/db.yml'
+    shell: 'ansible-playbook /vagrant/db.yml --key-file "/home/vagrant/.ssh/id_rsa"'
 
   - name: MySQL db_name - drupal, user - drupal, password - drupal, host - "{{ db_host }}"
-    shell: 'ansible-playbook /vagrant/web.yml'
+    shell: 'ansible-playbook /vagrant/web.yml --key-file "/home/vagrant/.ssh/id_rsa"'
 
   handlers:
