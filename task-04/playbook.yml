@@ -1,0 +1,82 @@
+- hosts: all
+  become: true
+  vars:
+   puppetserver_ip: "192.168.56.254"
+  tasks:
+  - name: Add Puppet Labs GPG key.
+    rpm_key:
+     key: 'https://yum.puppet.com/RPM-GPG-KEY-puppet-20250406'
+
+  - name: Install the puppet rpm from a remote repo
+    yum:
+     name: 'https://yum.puppet.com/puppet6-release-el-8.noarch.rpm'
+     state: present
+
+  - name: /etc/hosts
+    lineinfile:
+     path: '/etc/hosts'
+     insertafter: 'EOF'
+     line: "{{ puppetserver_ip }} puppetserver"
+
+- hosts: master.puppet
+  become: true
+  tasks:
+  - name: Install puppetserver
+    yum:
+     name: puppetserver
+     state: present
+
+  - name: Firewall add 8140/tcp
+    firewalld:
+     zone: public
+     port: '8140/tcp'
+     permanent: true
+     state: enabled
+    notify: 
+     - 'Reload firewalld'
+
+  - name: Memory Allocation to 512Mb
+    lineinfile:
+     path: '/etc/sysconfig/puppetserver'
+     regexp: '^JAVA_ARGS='
+     line: 'JAVA_ARGS="-Xms512m -Xmx512m"'
+
+  - name: Config puppetserver
+    blockinfile:
+     path: '/etc/puppetlabs/puppet/puppet.conf'
+     block: |
+      [main]
+      certname=puppetserver
+      server=puppetserver
+      [master]
+      certname=puppetserver
+      environment=production
+
+  - name: Start puppetserver
+    systemd:
+     name: puppetserver
+     state: started
+     enabled: True
+
+  handlers:
+   - name: Reload firewalld
+     service:
+      name: firewalld
+      state: reloaded
+
+- hosts: slave*.puppet
+  become: true
+  tasks:
+
+   - name: Install Agent
+     yum: 
+      name: puppet-agent 
+      state: present
+
+   - name: Config puppetserver
+     blockinfile:
+      path: '/etc/puppetlabs/puppet/puppet.conf'
+      block: |
+       [agent]
+       server=puppetserver
+
