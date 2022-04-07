@@ -16,7 +16,7 @@ end
   config.vm.define MASTER do |subconfig|
   subconfig.vm.hostname = "master"
   subconfig.vm.network "private_network", ip: MASTER_IP, hostname: true
-  subconfig.vm.provision "shell", run: "always", inline: <<-SHELL
+  subconfig.vm.provision "shell", inline: <<-SHELL
 sudo cat > /etc/sysctl.d/70-ipv6.conf << EOF
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
@@ -29,6 +29,11 @@ end
    config.vm.define "slave#{i}.puppet" do |subconfig|
    subconfig.vm.network "private_network", ip: "192.168.56.#{i}", hostname: true
    subconfig.vm.hostname = "slave#{i}.puppet"
+   if i == 1
+   subconfig.vm.network "forwarded_port", guest: 8080, host: 8080
+   elsif i == 2
+   subconfig.vm.network "forwarded_port", guest: 8008, host: 8081
+   end
 end
    
   end

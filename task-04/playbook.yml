@@ -23,8 +23,11 @@
   tasks:
   - name: Install puppetserver
     yum:
-     name: puppetserver
+     name: "{{ item }}"
      state: present
+    loop:
+     - puppetserver
+     - git
 
   - name: Firewall add 8140/tcp
     firewalld:
@@ -32,8 +35,11 @@
      port: '8140/tcp'
      permanent: true
      state: enabled
-    notify: 
-     - 'Reload firewalld'
+  
+  - name: Reload firewalld
+    service:
+     name: firewalld
+     state: restarted
 
   - name: Memory Allocation to 512Mb
     lineinfile:
@@ -45,6 +51,7 @@
     blockinfile:
      path: '/etc/puppetlabs/puppet/puppet.conf'
      block: |
+      autosign = true
       [main]
       certname=puppetserver
       server=puppetserver
@@ -58,6 +65,44 @@
      state: started
      enabled: True
 
+  - name: Export PATH
+    lineinfile:
+     dest: /etc/environment
+     line: "PATH=/home/vagrant/.local/bin:/home/vagrant/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/puppetlabs/bin:/opt/puppetlabs/puppet/bin"
+
+   #- name: Install r10k
+     #gem:
+      #name: r10k
+      #state: present
+     #environment:
+      #PATH: "/opt/puppetlabs/bin:/opt/puppetlabs/puppet/bin:$PATH"
+
+  - name: Create /etc/puppetlabs/r10k
+    file:
+     path: '/etc/puppetlabs/r10k'
+     state: directory
+
+  - name: Create r10k.yaml
+    file:
+     path: '/etc/puppetlabs/r10k/r10k.yaml'
+     state: touch
+
+  - name: r10k.yaml 
+    blockinfile:
+     path: '/etc/puppetlabs/r10k/r10k.yaml'
+     block: |
+      :cachedir: '/var/cache/r10k'
+      :sources:
+       :my-org:
+        remote: 'https://github.com/YuryNaumovich/puppet.git'
+        basedir: '/etc/puppetlabs/code/environments'
+  
+  - name: Install r10k 
+    shell: 'gem install r10k'
+
+  - name: Deploy environment
+    shell: 'r10k deploy environment -p'
+
   handlers:
    - name: Reload firewalld
      service:
@@ -70,13 +115,23 @@
 
    - name: Install Agent
      yum: 
-      name: puppet-agent 
+      name: "{{ item }}" 
       state: present
+     loop:
+      - puppet-agent
+      - git
 
    - name: Config puppetserver
      blockinfile:
       path: '/etc/puppetlabs/puppet/puppet.conf'
       block: |
        [agent]
-       server=puppetserver
+       server = puppetserver
+       runinterval = 1m
 
+   - name: start
+     become: true
+     service:
+      name: puppet
+      state: started
+      enabled: yes
