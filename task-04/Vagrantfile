@@ -3,6 +3,8 @@ PLAYBOOK = "playbook.yml"
 SLAVE_COUNT = 2
 MASTER = "master.puppet"
 MASTER_IP = "192.168.56.254"
+MINESERVER = "mineserver.puppet"
+MINESERVER_IP = "192.168.56.253"
 
 Vagrant.configure("2") do |config|
   config.vm.box = BOX_IMAGE
@@ -27,6 +29,12 @@ SHELL
   subconfig.vm.network "forwarded_port", guest: 82, host: 8083
 end
 
+  config.vm.define MINESERVER do |subconfig|
+  subconfig.vm.hostname = MINESERVER
+  subconfig.vm.network "private_network", ip: MINESERVER_IP, hostname: true
+  subconfig.vm.network "forwarded_port", guest: 25565, host: 25565
+  end
+
   (1..SLAVE_COUNT).each do |i|
    config.vm.define "slave#{i}.puppet" do |subconfig|
    subconfig.vm.network "private_network", ip: "192.168.56.#{i}", hostname: true
@@ -37,6 +45,7 @@ end
    subconfig.vm.network "forwarded_port", guest: 8008, host: 8081
    end
 end
-   
-  end
+
+
+end
 end

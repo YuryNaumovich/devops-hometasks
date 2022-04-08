@@ -119,7 +119,7 @@
       name: firewalld
       state: reloaded
 
-- hosts: slave*.puppet
+- hosts: slave*.puppet,mineserver.puppet
   become: true
   tasks:
 
