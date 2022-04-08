@@ -58,6 +58,9 @@
       [master]
       certname=puppetserver
       environment=production
+      [agent]
+      server = puppetserver
+      runinterval = 1m
 
   - name: Start puppetserver
     systemd:
@@ -102,6 +105,13 @@
 
   - name: Deploy environment
     shell: 'r10k deploy environment -p'
+
+  - name: start
+    become: true
+    service:
+     name: puppet
+     state: started
+     enabled: yes
 
   handlers:
    - name: Reload firewalld

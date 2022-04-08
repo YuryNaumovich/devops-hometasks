@@ -23,6 +23,8 @@ net.ipv6.conf.default.disable_ipv6 = 1
 EOF
 sudo sysctl --load /etc/sysctl.d/70-ipv6.conf
 SHELL
+  subconfig.vm.network "forwarded_port", guest: 81, host: 8082
+  subconfig.vm.network "forwarded_port", guest: 82, host: 8083
 end
 
   (1..SLAVE_COUNT).each do |i|
