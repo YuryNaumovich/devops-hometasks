@@ -1,0 +1,157 @@
+- hosts: jenkins
+  become: true
+  tasks:
+  - name: Add the repository key
+    get_url: 
+     url: 'https://pkg.jenkins.io/debian-stable/jenkins.io.key'
+     dest: '/usr/src/jenkins.io.key'
+
+  - name: Add a key (apt-key Is Deprecated)
+    shell: 'cat /usr/src/jenkins.io.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/jenkins.gpg  >/dev/null'
+
+  - name: Add specified repository into sources list
+    apt_repository:
+     repo: 'deb [signed-by=/etc/apt/trusted.gpg.d/jenkins.gpg] https://pkg.jenkins.io/debian-stable binary/'
+     state: present
+
+  - name: apt-get update
+    apt: 
+     update_cache: yes
+
+  - name: Install packages
+    apt:
+     name: "{{ item }}"
+     state: present
+    loop: 
+     - openjdk-11-jre
+     - jenkins
+
+  - name: Stop Jenkins
+    service:
+     name: jenkins
+     state: stopped
+
+  - name: Download Jenkins folder
+    ansible.builtin.unarchive:
+      src: "https://github.com/YuryNaumovich/devops-hometasks/raw/main/task-06/jenkins.tar.gz"
+      dest: '/'
+      remote_src: yes
+
+  - name: Start Jenkins
+    service:
+     name: jenkins
+     state: started
+     enabled: yes
+
+  - name: Install plugins
+    community.general.jenkins_plugin:
+     name: "{{ item }}"
+     url_username: admin
+     url_password: admin
+     url: 'http://localhost:8080'
+     timeout: 300
+    loop:
+     - github
+     - git-server
+     - git-client
+     - golang
+     - nexus-artifact-uploader
+
+  - name: Create folder Go_1.16
+    ansible.builtin.file:
+      path: '/var/lib/jenkins/tools/org.jenkinsci.plugins.golang.GolangInstallation/Go_1.16'
+      state: directory
+      recurse: yes
+      owner: 'jenkins'
+      group: 'jenkins'
+      mode: '0755'
+
+  - name: Restart Jenkins
+    service:
+     name: jenkins
+     state: restarted
+
+- hosts: nexus
+  become: true
+  vars:
+    nexus_version: nexus-3.38.1-01
+  tasks:
+  - name: Debian 11 repo Java 8 packages
+    apt_repository:
+      repo: "{{ item }}"
+      state: present
+    loop: 
+    - deb http://ftp.debian.org/debian stretch main
+    - deb-src http://ftp.debian.org/debian stretch main
+
+  - name: Install Java 8 on Debian 11
+    apt: 
+      name: "{{ item }}"
+      state: present
+    loop:
+     - openjdk-8-jdk
+
+  - name: Create Group nexus
+    ansible.builtin.group:
+      name: nexus
+      state: present
+
+  - name: Create user - nexus
+    ansible.builtin.user:
+      name: nexus
+      group: nexus
+      state: present 
+
+  - name: check if nexus exists
+    stat: 
+      path: "/opt/{{ nexus_version }}"
+    register: nexus_directory
+
+  - name: Extract
+    ansible.builtin.unarchive:
+      src: "https://download.sonatype.com/nexus/3/{{ nexus_version }}-unix.tar.gz"
+      dest: '/opt/'
+      remote_src: yes
+    when: nexus_directory.stat.exists == False
+
+  - name: Change owner nexus folder
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      recurse: yes
+      owner: 'nexus'
+      group: 'nexus'
+      mode: '0755'
+    loop:
+     - "/opt/sonatype-work"
+     - "/opt/{{ nexus_version }}"
+
+  - name: Create service nexus
+    file: 
+      path: '/etc/systemd/system/nexus.service'
+      state: touch
+
+  - name: nexus.service
+    blockinfile:
+      path: '/etc/systemd/system/nexus.service'
+      block: |
+        [Unit]
+        Description=nexus service
+        After=network.target
+
+        [Service]
+        Type=forking
+        LimitNOFILE=65536
+        ExecStart=/opt/{{ nexus_version }}/bin/nexus start
+        ExecStop=/opt/{{ nexus_version }}/bin/nexus stop
+        User=nexus
+        Restart=on-abort
+
+        [Install]
+        WantedBy=multi-user.target
+
+  - name: Start nexus service
+    systemd:
+      name: nexus.service
+      enabled: yes
+      state: started
