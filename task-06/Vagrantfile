@@ -14,23 +14,35 @@ Vagrant.configure("2") do |config|
 
  config.vm.provision "ansible_local" do |ansible|
   ansible.playbook = "playbook.yml"
+  #ansible.tags = "nexus"
  end
 
  config.vm.provider "virtualbox" do |v|
    v.memory = 2048
    v.cpus = 4
  end
- 
- config.vm.define JENKINS do |subconfig|
-   subconfig.vm.hostname = JENKINS
-   subconfig.vm.network "private_network", ip: JENKINS_IP, hostname: true
-   subconfig.vm.network "forwarded_port", guest: 8080, host: 8080
- end
 
  config.vm.define NEXUS do |subconfig|
    subconfig.vm.hostname = NEXUS
    subconfig.vm.network "private_network", ip: NEXUS_IP, hostname: true
    subconfig.vm.network "forwarded_port", guest: 8081, host: 8081
+ end
+
+ config.vm.define STAGING do |subconfig|
+   subconfig.vm.hostname = STAGING
+   subconfig.vm.network "private_network", ip: STAGING_IP, hostname: true
+ end
+
+  config.vm.define PRODACTION do |subconfig|
+   subconfig.vm.hostname = PRODACTION
+   subconfig.vm.network "private_network", ip: PRODACTION_IP, hostname: true
+   subconfig.vm.network "forwarded_port", guest: 8888, host: 8888
+ end
+ 
+ config.vm.define JENKINS do |subconfig|
+   subconfig.vm.hostname = JENKINS
+   subconfig.vm.network "private_network", ip: JENKINS_IP, hostname: true
+   subconfig.vm.network "forwarded_port", guest: 8080, host: 8080
  end
   
 end
