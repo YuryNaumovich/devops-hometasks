@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     environment {
-        NEXUS_IP = '192.168.56.101'
-        STAGE_IP = '192.168.56.102'
-        PRODUCTION_IP = '192.168.56.103'
+        NEXUS_IP = '192.168.33.90'
+        STAGE_IP = '192.168.33.80'
+        PRODUCTION_IP = '192.168.33.85'
         NEXUS_REPOSITORY = 'word-cloud-build'
         ARTIFACT_ID = 'word-cloud-generator'
-        NEXUS_CREDENTIALSID = '213dd042-007a-4878-8b63-890c258cc055'
+        NEXUS_CREDENTIALSID = 'nexus-creds'
         STAGE = credentials('66c5407b-9f69-4c88-8540-ff721e5343b9')
         PRODUCTION = credentials('66c5407b-9f69-4c88-8540-ff721e5343b9')
         INSTALL = ''' sshpass -p ${PASSWORD} ssh -T -o StrictHostKeyChecking=no ${USER}@${IP} << EOF
