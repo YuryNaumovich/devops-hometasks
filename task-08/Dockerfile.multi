@@ -1,0 +1,17 @@
+FROM golang:1.16 as build
+RUN apt-get update && apt-get install git make
+
+WORKDIR /opt
+RUN git clone https://github.com/Fenikks/word-cloud-generator.git
+
+WORKDIR /opt/word-cloud-generator
+RUN make
+
+
+FROM alpine:latest
+RUN apk add --no-cache libc6-compat
+COPY --from=build /opt/word-cloud-generator/artifacts/linux/word-cloud-generator /opt/word-cloud-generator
+RUN ls /opt/
+
+EXPOSE 8888
+CMD /opt/word-cloud-generator -D FOREGROUND
