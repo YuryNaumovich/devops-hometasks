@@ -1,0 +1,69 @@
+- hosts: jenkins
+  become: true
+  tasks:
+  - name: Add the repository key
+    get_url: 
+     url: 'https://pkg.jenkins.io/debian-stable/jenkins.io.key'
+     dest: '/usr/src/jenkins.io.key'
+
+  - name: Add a key (apt-key Is Deprecated)
+    shell: 'cat /usr/src/jenkins.io.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/jenkins.gpg  >/dev/null'
+
+  - name: Add specified repository into sources list
+    apt_repository:
+     repo: 'deb [signed-by=/etc/apt/trusted.gpg.d/jenkins.gpg] https://pkg.jenkins.io/debian-stable binary/'
+     state: present
+
+  - name: apt-get update
+    apt: 
+     update_cache: yes
+
+  - name: Install packages
+    apt:
+     name: "{{ item }}"
+     state: present
+    loop: 
+     - openjdk-11-jdk-headless
+     - jenkins
+     - jq
+
+  - name: Download Jenkins folder
+    ansible.builtin.unarchive:
+      src: "https://github.com/YuryNaumovich/devops-hometasks/raw/main/task-06/jenkins.tar.gz"
+      dest: '/'
+      remote_src: yes
+
+  - name: Create folder Go_1.16
+    ansible.builtin.file:
+      path: '/var/lib/jenkins/tools/org.jenkinsci.plugins.golang.GolangInstallation/Go_1.16'
+      state: directory
+      recurse: yes
+      owner: 'jenkins'
+      group: 'jenkins'
+      mode: '0755'
+
+  - name: Start Jenkins
+    sysvinit:
+      name: jenkins
+      state: started
+      enabled: yes
+
+  - name: wait start jenkins
+    shell: 'sleep 60'    
+
+  - name: Install plugins
+    tags: plugin
+    community.general.jenkins_plugin:
+      name: "{{ item }}"
+      url_username: admin
+      url_password: admin
+      url: 'http://localhost:8080'
+      timeout: 500
+    loop:
+     - github
+     - git-server
+     - git-client
+     - golang
+     - nexus-artifact-uploader
+     - copyartifact
+     - ssh
