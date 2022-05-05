@@ -1,4 +1,4 @@
-- hosts: jenkins
+- hosts: default
   become: true
   tasks:
   - name: Add the repository key
