@@ -1,0 +1,196 @@
+- hosts: localhost
+  become: true
+  vars:
+    nexus_version: nexus-3.38.1-01
+    nexus_user: admin
+    nexus_api_url: http://192.168.56.101:8081/service/rest/v1
+    nexus_repository: word-cloud-build
+    nexus_role_upload_id: 1
+    nexus_role_upload_name: raw-uploader
+    nexus_user_upload_name: uploader
+    nexus_user_upload_password: uploader
+    nexus_user_upload_email: yurynaumovich@icloud.com
+    nexus_role_browse_id: 2
+    nexus_role_browse_name: raw-browse
+    nexus_user_browse_name: browse
+    nexus_user_browse_password: browse
+    nexus_user_browse_email: yurynaumovich@icloud.com
+  tasks:
+  - name: Debian 11 repo Java 8 packages
+    apt_repository:
+      repo: "{{ item }}"
+      state: present
+    loop: 
+    - deb http://ftp.debian.org/debian stretch main
+    - deb-src http://ftp.debian.org/debian stretch main
+
+  - name: Install Java 8 on Debian 11
+    apt: 
+      name: "{{ item }}"
+      state: present
+    loop:
+     - openjdk-8-jdk
+
+  - name: Create Group nexus
+    ansible.builtin.group:
+      name: nexus
+      state: present
+
+  - name: Create user - nexus
+    ansible.builtin.user:
+      name: nexus
+      group: nexus
+      state: present 
+
+  - name: check if nexus exists
+    stat: 
+      path: "/opt/{{ nexus_version }}"
+    register: nexus_directory
+
+  - name: Extract
+    ansible.builtin.unarchive:
+      src: "https://download.sonatype.com/nexus/3/{{ nexus_version }}-unix.tar.gz"
+      dest: '/opt/'
+      remote_src: yes
+    when: nexus_directory.stat.exists == False
+
+  - name: Change owner nexus folder
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      recurse: yes
+      owner: 'nexus'
+      group: 'nexus'
+      mode: '0755'
+    loop:
+     - "/opt/sonatype-work"
+     - "/opt/{{ nexus_version }}"
+
+  - name: Create nexus.service
+    community.general.ini_file:
+      path: '/etc/systemd/system/nexus.service'
+      section: "{{ item.section }}"
+      option: "{{ item.option }}"
+      value: "{{ item.value }}"
+    loop:
+    - { section: 'Unit', option: 'Description', value: 'nexus service' }
+    - { section: 'Unit', option: 'After', value: 'network.target' }
+    - { section: 'Service', option: 'Type', value: 'forking' }
+    - { section: 'Service', option: 'LimitNOFILE', value: '65536' }
+    - { section: 'Service', option: 'ExecStart', value: "/opt/{{ nexus_version }}/bin/nexus start" }
+    - { section: 'Service', option: 'ExecStop', value: "/opt/{{ nexus_version }}/bin/nexus stop" } 
+    - { section: 'Service', option: 'User', value: 'nexus' }
+    - { section: 'Service', option: 'Restart', value: 'on-abort' }
+    - { section: 'Install', option: 'WantedBy', value: 'multi-user.target' }
+
+  - name: Start nexus service
+    systemd:
+      name: nexus.service
+      enabled: yes
+      state: started
+
+  - name: Select nexus password after install
+    shell: "cat /opt/sonatype-work/nexus3/admin.password"
+    register: nexus_password
+    until: nexus_password.stdout != ''
+    retries: 100
+    delay: 2
+
+  - name: Create Nexus repositosies if not exist - {{ nexus_repository }}
+    uri:
+      url: "{{ nexus_api_url }}/repositories/raw/hosted/{{ nexus_repository }}"
+      method: GET
+      force_basic_auth: yes
+      user: "{{ nexus_user }}"
+      password: "{{ nexus_password.stdout }}"
+      body_format: json
+      headers:
+        Accept: application/json
+      status_code:
+      - 404
+      - 200
+    register: repository
+    until: repository.status == 200 or repository.status == 404
+    retries: 100
+    delay: 2
+
+  - name: Create Nexus repositories
+    uri:
+      url: "{{ nexus_api_url }}/repositories/raw/hosted"
+      method: POST
+      force_basic_auth: yes
+      user: "{{ nexus_user }}"
+      password: "{{ nexus_password.stdout }}"
+      body_format: json
+      headers:
+        Accept: application/json
+        Content-Type: application/json
+      body:
+        name: "{{ nexus_repository }}"
+        online: true
+        storage: 
+          blobStoreName: default
+          strictContentTypeValidation: true
+          writePolicy: allow_once
+        cleanup:
+          policyNames: ["string"]
+        component:
+          proprietaryComponents: true
+        raw:
+          contentDisposition: ATTACHMENT
+      status_code: 201
+    when: repository.status != 200
+
+  - name: Create role for upload if not exist
+    uri:
+      url: "{{ nexus_api_url }}/security/roles"
+      method: POST
+      force_basic_auth: yes
+      user: "{{ nexus_user }}"
+      password: "{{ nexus_password.stdout }}"
+      body_format: json
+      headers:
+        Accept: application/json
+        Content-Type: application/json
+      body:
+        id: "{{ item.id }}"
+        name: "{{ item.name }}"
+        description: "{{ item.description }}" 
+        privileges: "{{ item.privileges }}"
+      status_code: 
+      - 200
+      - 400
+    loop: 
+    - { id: "{{ nexus_role_upload_id }}", name: "{{ nexus_role_upload_name }}", description: 'User for Jenkins to upload', privileges: ["nx-repository-view-*-*-*"] }
+    - { id: "{{ nexus_role_browse_id }}", name: "{{ nexus_role_browse_name }}", description: 'User for browse', privileges: ["nx-repository-view-raw-{{ nexus_repository }}-read"] }
+     
+  - name: Create user for upload
+    uri:
+      url: "{{ nexus_api_url }}/security/users"
+      method: POST
+      force_basic_auth: yes
+      user: "{{ nexus_user }}"
+      password: "{{ nexus_password.stdout }}"
+      body_format: json
+      headers:
+        Accept: application/json
+        Content-Type: application/json
+      body:     
+        userId: "{{ item.userId }}"
+        firstName: "{{ item.firstName }}"
+        lastName: "{{ item.lastName }}"
+        emailAddress: "{{ item.emailAddress }}"
+        password: "{{ item.password }}"
+        status: active
+        roles: "{{ item.roles }}"
+      status_code:
+      - 200
+      - 500
+    loop:
+    - { userId: "{{ nexus_user_upload_name }}", firstName: "{{ nexus_user_upload_name }}", lastName: "{{ nexus_user_upload_name }}", emailAddress: "{{ nexus_user_upload_email }}", password: "{{ nexus_user_upload_password }}", roles: ["{{ nexus_role_upload_id }}"] }
+    - { userId: "{{ nexus_user_browse_name }}", firstName: "{{ nexus_user_browse_name }}", lastName: "{{ nexus_user_browse_name }}", emailAddress: "{{ nexus_user_browse_email }}", password: "{{ nexus_user_browse_password }}", roles: ["{{ nexus_role_browse_id }}"] }
+
+  - name: Start nexus service
+    service:
+      name: nexus
+      state: restarted
