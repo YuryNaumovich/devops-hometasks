@@ -189,8 +189,3 @@
     loop:
     - { userId: "{{ nexus_user_upload_name }}", firstName: "{{ nexus_user_upload_name }}", lastName: "{{ nexus_user_upload_name }}", emailAddress: "{{ nexus_user_upload_email }}", password: "{{ nexus_user_upload_password }}", roles: ["{{ nexus_role_upload_id }}"] }
     - { userId: "{{ nexus_user_browse_name }}", firstName: "{{ nexus_user_browse_name }}", lastName: "{{ nexus_user_browse_name }}", emailAddress: "{{ nexus_user_browse_email }}", password: "{{ nexus_user_browse_password }}", roles: ["{{ nexus_role_browse_id }}"] }
-
-  - name: Start nexus service
-    service:
-      name: nexus
-      state: restarted
