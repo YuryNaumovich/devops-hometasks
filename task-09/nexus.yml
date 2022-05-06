@@ -3,7 +3,7 @@
   vars:
     nexus_version: nexus-3.38.1-01
     nexus_user: admin
-    nexus_api_url: http://192.168.56.101:8081/service/rest/v1
+    nexus_api_url: http://127.0.0.1:8081/service/rest/v1
     nexus_repository: word-cloud-build
     nexus_role_upload_id: 1
     nexus_role_upload_name: raw-uploader
