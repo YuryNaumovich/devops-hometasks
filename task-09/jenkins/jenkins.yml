@@ -26,12 +26,16 @@
      - openjdk-11-jdk-headless
      - jenkins
      - jq
+     - wget
 
   - name: Download Jenkins folder
     ansible.builtin.unarchive:
       src: "https://github.com/YuryNaumovich/devops-hometasks/raw/main/task-06/jenkins.tar.gz"
       dest: '/'
       remote_src: yes
+      owner: 'jenkins'
+      group: 'jenkins'
+      mode: '0755'
 
   - name: Create folder Go_1.16
     ansible.builtin.file:

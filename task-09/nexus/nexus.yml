@@ -29,7 +29,7 @@
       name: "{{ item }}"
       state: present
     loop:
-     - openjdk-8-jdk
+     - openjdk-8-jdk-headless
 
   - name: Create Group nexus
     ansible.builtin.group:
@@ -42,17 +42,11 @@
       group: nexus
       state: present 
 
-  - name: check if nexus exists
-    stat: 
-      path: "/opt/{{ nexus_version }}"
-    register: nexus_directory
-
   - name: Extract
     ansible.builtin.unarchive:
       src: "https://download.sonatype.com/nexus/3/{{ nexus_version }}-unix.tar.gz"
       dest: '/opt/'
       remote_src: yes
-    when: nexus_directory.stat.exists == False
 
   - name: Change owner nexus folder
     ansible.builtin.file:
@@ -68,7 +62,7 @@
 
   - name: Create nexus.service
     community.general.ini_file:
-      path: '/etc/systemd/system/nexus.service'
+      path: '/lib/systemd/system/nexus.service'
       section: "{{ item.section }}"
       option: "{{ item.option }}"
       value: "{{ item.value }}"
@@ -83,11 +77,9 @@
     - { section: 'Service', option: 'Restart', value: 'on-abort' }
     - { section: 'Install', option: 'WantedBy', value: 'multi-user.target' }
 
+
   - name: Start nexus service
-    systemd:
-      name: nexus.service
-      enabled: yes
-      state: started
+    shell: "/opt/{{ nexus_version }}/bin/nexus start"
 
   - name: Select nexus password after install
     shell: "cat /opt/sonatype-work/nexus3/admin.password"
