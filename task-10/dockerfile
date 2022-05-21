@@ -1,0 +1,20 @@
+FROM debian:latest
+
+# File Author 
+MAINTAINER Yury_Naumovich
+
+# Update the repository sources list
+RUN apt-get update && apt-get upgrade -y
+
+# Install and run apache
+RUN apt-get install -y apache2 php wget && apt-get clean
+
+# Delete default html and wget index.php
+RUN rm /var/www/html/index.html
+RUN wget -O /var/www/html/index.html https://raw.githubusercontent.com/Fenikks/itacademy-devops-files/master/01-demosite-static/index.html
+
+# Open 80 port
+EXPOSE 80
+
+# Start apache2 
+CMD apachectl -D FOREGROUND
