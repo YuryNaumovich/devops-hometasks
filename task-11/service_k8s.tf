@@ -15,6 +15,6 @@ resource "kubernetes_service" "Service" {
             target_port = var.apache2_port
         }
 
-        type = "LoadBalancer"
+        type = "NodePort"
     }
 } 

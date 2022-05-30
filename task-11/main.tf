@@ -4,6 +4,11 @@ terraform {
       source = "hashicorp/kubernetes"
       version = "2.11.0"
     }
+    github = {
+      source = "integrations/github"
+      version = "4.26.0"
+    }
+    
   }
 
   backend "kubernetes" {
@@ -19,8 +24,14 @@ provider "kubernetes" {
    config_path = "~/.kube/config"
 }
 
-resource "kubernetes_namespace" "default" {
+resource "kubernetes_namespace" "terraform-default" {
   metadata {
-    name = "default"
+    name = "terraform-default"
   }
+}
+
+provider "github" {
+  # Configuration options
+  token = "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"
+  owner = "YuryNaumovich"
 }
