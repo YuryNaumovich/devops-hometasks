@@ -37,6 +37,15 @@
       group: 'jenkins'
       mode: '0755'
 
+  - name: Job pipeline
+    unarchive:
+     src: 'https://github.com/YuryNaumovich/devops-hometasks/raw/main/final/jobs.tar.gz'
+     dest: '/'
+     remote_src: yes
+     owner: 'jenkins'
+     group: 'jenkins'
+     mode: '0755'
+
   - name: Create folder Go_1.16
     file:
       path: '/var/lib/jenkins/tools/org.jenkinsci.plugins.golang.GolangInstallation/Go_1.16'
