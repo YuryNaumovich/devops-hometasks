@@ -3,12 +3,16 @@ services:
   
   jenkins:
     build: jenkins/
+    privileged: true
     ports: 
-      - "80:8080"
+      - "8080:8080"
         #volumes:
         #- /vagrant/jenkins/jenkins:/var/lib/jenkins
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - workspace:/var/lib/jenkins/workspace/
+      - /vagrant:/vagrant
+
     networks:
       bridge:
       vagrant:
@@ -20,13 +24,15 @@ services:
   nexus:
     build: nexus/
     ports:
-      - "81:8081"
+      - "8081:8081"
     #volumes: 
       #- /vagrant/nexus/nexus-data:/nexus-data
     networks:
       bridge:
       vagrant:
         ipv4_address: 192.168.56.101
+    hostname: nexus
+
 
 networks:
   bridge:
@@ -36,3 +42,5 @@ networks:
        config:
        - subnet: 192.168.56.0/24
 
+volumes:
+  workspace:

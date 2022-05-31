@@ -1,8 +1,10 @@
 - hosts: localhost
   become: true
   vars:
-    nexus_version: nexus-3.38.1-01
+    #nexus_version: nexus-3.38.1-01
+    nexus_version: nexus-3.39.0-01
     nexus_user: admin
+    nexus_admin_password: admin
     nexus_api_url: http://127.0.0.1:8081/service/rest/v1
     nexus_repository: word-cloud-build
     nexus_role_upload_id: 1
@@ -181,3 +183,58 @@
     loop:
     - { userId: "{{ nexus_user_upload_name }}", firstName: "{{ nexus_user_upload_name }}", lastName: "{{ nexus_user_upload_name }}", emailAddress: "{{ nexus_user_upload_email }}", password: "{{ nexus_user_upload_password }}", roles: ["{{ nexus_role_upload_id }}"] }
     - { userId: "{{ nexus_user_browse_name }}", firstName: "{{ nexus_user_browse_name }}", lastName: "{{ nexus_user_browse_name }}", emailAddress: "{{ nexus_user_browse_email }}", password: "{{ nexus_user_browse_password }}", roles: ["{{ nexus_role_browse_id }}"] }
+
+  - name: Delete default repositories
+    uri:
+      url: "{{ nexus_api_url }}/repositories/{{ item }}"
+      method: DELETE
+      force_basic_auth: yes
+      user: "{{ nexus_user }}"
+      password: "{{ nexus_password.stdout }}"
+      body_format: json
+      headers:
+        Accept: application/json
+      status_code:
+      - 204
+      - 404
+    loop: 
+    - 'maven-central'
+    - 'maven-public'
+    - 'maven-releases'
+    - 'maven-snapshots'
+    - 'nuget-group'
+    - 'nuget-hosted'
+    - 'nuget.org-proxy'
+
+  - name: Disable anonymouse access
+    uri:
+      url: "{{ nexus_api_url }}/security/anonymous"
+      method: PUT
+      force_basic_auth: yes
+      user: "{{ nexus_user }}"
+      password: "{{ nexus_password.stdout }}"
+      body_format: json
+      headers:
+        Accept: application/json
+        Content-Type: application/json
+      body:
+        enabled: false
+        userId: anonymous
+        realmName: NexusAuthorizingRealm
+      status_code:
+       - 200
+
+  - name: Change nexus admin password
+    uri: 
+      url: "{{ nexus_api_url }}/security/users/{{ nexus_user }}/change-password"
+      method: PUT
+      force_basic_auth: yes
+      user: "{{ nexus_user }}"
+      password: "{{ nexus_password.stdout }}"
+      body_format: json
+      headers:
+        Content-Type: text/plain
+      body: "{{ nexus_admin_password }}"
+      status_code:
+      - 204
+      - 400

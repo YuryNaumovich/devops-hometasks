@@ -4,25 +4,32 @@ apt-get install docker.io docker-compose -y
 # Docker without sudo
 sudo gpasswd -a vagrant docker
 newgrp docker
+# Need for Jenkins Agent Docker
+sudo chmod 777 /var/run/docker.sock
+sudo chmod 777 /home/vagrant
 # Start jenkins & nexus in docker
 sudo docker-compose --file /vagrant/docker-compose.yml build
 sudo docker-compose --file /vagrant/docker-compose.yml up --no-start
 sudo docker-compose --file /vagrant/docker-compose.yml start
-# Need for Jenkins agent Docker
-sudo chmod a+rwx /var/run/docker.sock
 SCRIPT
 
 Vagrant.configure("2") do |config|
- config.vm.box = "generic/debian11"
+ config.vm.box = "generic/debian10"
  
  # Network
  config.vm.network :private_network, ip: "192.168.56.1"
- config.vm.network :forwarded_port, guest: 80, host: 8080
- config.vm.network :forwarded_port, guest: 81, host: 8081  
+ config.vm.network :forwarded_port, guest: 8080, host: 8080
+ config.vm.network :forwarded_port, guest: 8081, host: 8081  
 
  config.vm.hostname = "docker"
  config.vm.provision "shell", inline: $docker_install
  config.vm.synced_folder ".", "/vagrant" 
+
+ config.ssh.private_key_path = "/home/newik/.ssh/id_rsa"
+ config.ssh.forward_agent = true
+
+ config.ssh.username = 'vagrant'
+ config.ssh.password = 'vagrant'
 
  config.vm.provider "virtualbox" do |v|
    v.memory = 4096

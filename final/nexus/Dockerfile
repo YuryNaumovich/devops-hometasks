@@ -23,4 +23,4 @@ RUN ansible-playbook -i inventory playbook.yml
 EXPOSE 8081
 
 USER root
-CMD ["/opt/nexus-3.38.1-01/bin/nexus", "run"]
+CMD ["/opt/nexus-3.39.0-01/bin/nexus", "run"]
